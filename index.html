@@ -93,6 +93,27 @@
   .hidden { display: none !important; }
   .empty { color: var(--dim); font-size: 13px; }
   .footnote { color: var(--dim); font-size: 12px; margin-top: 8px; }
+  /* ---- 관리자 패널 (#admin) ---- */
+  textarea {
+    background: var(--bg); color: var(--text); border: 1px solid var(--line);
+    border-radius: 7px; padding: 8px 10px; font-family: var(--mono);
+    font-size: 12.5px; line-height: 1.5; width: 100%; resize: vertical;
+  }
+  textarea:focus { outline: 2px solid var(--gold-dim); border-color: var(--gold-dim); }
+  #adminPanel .field { width: 100%; }
+  #adminPanel input[type=text] { width: 100%; }
+  .admin-card { border-color: var(--gold-dim); background: rgba(217,164,65,.06); }
+  .admin-out { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .admin-out .ln { padding: 7px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel2); font-size: 12.5px; font-family: var(--mono); }
+  .admin-out .ln.ok   { border-color: rgba(88,185,124,.5); color: var(--ok); }
+  .admin-out .ln.warn { border-color: rgba(217,164,65,.5); color: var(--warn); }
+  .admin-out .ln.bad  { border-color: rgba(217,106,94,.5); color: var(--bad); }
+  .admin-out .ln.head { background: transparent; border: 0; font-weight: 700; color: var(--text); font-family: var(--sans); padding: 6px 0 0; }
+  .admin-check { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--dim); }
+  .admin-check input { min-width: 0; width: auto; }
+  .admin-img-preview { max-width: 100%; max-height: 220px; border: 1px solid var(--line); border-radius: 7px; margin-top: 8px; display: block; }
+  .mode-toggle .admin-toggle { border-left: 1px solid var(--line); color: var(--gold); }
+  body.admin-view .user-ui { display: none !important; }  /* #admin 진입 시 일반 UI 숨김 → 관리자만 */
 </style>
 </head>
 <body>
@@ -102,15 +123,16 @@
     <h1>세나리버스 <span class="gold">세팅 판정기</span></h1>
     <span class="ver">v0.3 · 한계 교환 모델</span>
   </div>
-  <div class="notice">월요일 공성전은 실측 검증 완료 데이터입니다. 나머지 콘텐츠는 검증 후 순차 추가됩니다.</div>
+  <div class="notice user-ui">월요일 공성전은 실측 검증 완료 데이터입니다. 나머지 콘텐츠는 검증 후 순차 추가됩니다.</div>
   <div class="mode-toggle" role="tablist">
     <button id="modeBasic" class="active">Basic</button>
     <button id="modeStandard">Standard</button>
+    <button id="modeAdmin" class="admin-toggle hidden">관리자</button>
   </div>
 </header>
 
 <!-- 1. 선택 -->
-<div class="card">
+<div class="card user-ui">
   <h2>콘텐츠 · 캐릭터</h2>
   <div class="field-row">
     <div class="field"><label for="contentSel">콘텐츠</label><select id="contentSel"></select></div>
@@ -120,7 +142,7 @@
 </div>
 
 <!-- 2. 스탯 입력 + 판정 -->
-<div class="card">
+<div class="card user-ui">
   <h2>스탯 입력 → 판정 <span style="text-transform:none">(게임 화면의 명목 수치 그대로)</span></h2>
   <div class="field-row">
     <div class="field"><label>치확 (명목)</label><input type="number" id="inCC" value="60" min="0" max="100"></div>
@@ -145,7 +167,7 @@
 </div>
 
 <!-- 3. 줄 감사 -->
-<div class="card">
+<div class="card user-ui">
   <h2>줄 감사 <span style="text-transform:none">(장비 부옵이 어디에 몇 줄 갔는지 역산)</span></h2>
   <div class="field-row">
     <div class="field"><label>무기1 주옵</label>
@@ -163,7 +185,7 @@
 </div>
 
 <!-- 4. 프리셋 (Standard) -->
-<div class="card std-only hidden">
+<div class="card user-ui std-only hidden">
   <h2>프리셋</h2>
   <div class="preset-row">
     <div class="field"><label for="presetName">프리셋 이름</label><input type="text" id="presetName" placeholder="예: 월공성 나타"></div>
@@ -174,6 +196,65 @@
   </div>
   <div class="preset-list" id="presetList"></div>
   <div class="storage-note" id="storageNote"></div>
+</div>
+
+<!-- ADMIN: 복붙 브릿지 (URL #admin 진입). 일반 UI 아님 — 혼자 쓰는 관리 기능. -->
+<div id="adminPanel" class="hidden">
+  <div class="card admin-card">
+    <h2>⚙ 관리자 · 복붙 브릿지 <span style="text-transform:none">(#admin)</span></h2>
+    <p class="footnote">API·네트워크 없음. ① 프롬프트 생성 → 아무 Claude 채팅에 복붙 → ② 나온 JSON을 붙여 검증·병합 → data.js 내려받기 → GitHub 업로드.</p>
+  </div>
+
+  <!-- 5.2 프롬프트 생성기 -->
+  <div class="card">
+    <h2>① 프롬프트 생성</h2>
+    <div class="field-row">
+      <div class="field" style="width:auto"><label for="adId">콘텐츠 id</label><input type="text" id="adId" placeholder="예: mon_siege" style="width:160px"></div>
+      <div class="field" style="width:auto"><label for="adName">콘텐츠 이름</label><input type="text" id="adName" placeholder="예: 월요일 공성전" style="width:200px"></div>
+      <div class="field" style="width:auto"><label for="adScoring">채점</label>
+        <select id="adScoring"><option value="best1of5">best1of5</option><option value="top3of9">top3of9</option><option value="single">single</option></select></div>
+    </div>
+    <div class="field" style="margin-top:10px"><label for="adGuide">자연어 공략 원문 <span style="font-weight:400;color:var(--dim)">(선택 — 이미지 첨부 시 비워도 됨)</span></label>
+      <textarea id="adGuide" rows="6" placeholder="공략 텍스트를 붙여넣거나, 아래에서 공략 이미지를 첨부하세요."></textarea></div>
+    <div class="field" style="margin-top:10px"><label>공략 이미지 첨부 <span style="font-weight:400;color:var(--dim)">(선택)</span></label>
+      <div class="preset-row" style="align-items:center">
+        <button class="act" id="adImgBtn" type="button">이미지 선택</button>
+        <input type="file" id="adImgFile" accept="image/*" class="hidden">
+        <button class="act hidden" id="adImgClear" type="button">제거</button>
+        <span id="adImgName" class="footnote" style="margin:0"></span>
+      </div>
+      <img id="adImgPreview" class="admin-img-preview hidden" alt="공략 이미지 미리보기">
+      <p class="footnote" style="margin-top:6px">⚠ 앱은 이미지를 읽지 않습니다(OCR·전송 없음). 미리보기·확인용일 뿐이며, 프롬프트 복사 후 <b>Claude 채팅에 이 이미지를 함께 첨부</b>해야 LLM이 이미지에서 값을 읽습니다.</p>
+    </div>
+    <div class="field" style="margin-top:10px"><label for="adNominal">명목 스탯 (자유 형식, 선택)</label>
+      <textarea id="adNominal" rows="3" placeholder="예: 나타 치확67 약확46 / 미호 치확46 약확46 ..."></textarea></div>
+    <div class="preset-row" style="margin-top:10px">
+      <button class="act primary" id="adGenBtn">프롬프트 생성</button>
+      <button class="act" id="adCopyBtn">복사</button>
+      <span id="adCopyMsg" class="footnote" style="margin:0"></span>
+    </div>
+    <div class="field" style="margin-top:10px"><label for="adPromptOut">생성된 프롬프트</label>
+      <textarea id="adPromptOut" rows="10" readonly placeholder="여기에 표시됩니다. 복사해서 Claude 채팅에 붙여넣으세요."></textarea></div>
+  </div>
+
+  <!-- 5.3 + 5.4 수신·검증·병합 -->
+  <div class="card">
+    <h2>② JSON 붙여넣기 → 검증 → 병합</h2>
+    <div class="field"><label for="adJson">LLM이 출력한 JSON</label>
+      <textarea id="adJson" rows="8" placeholder='contentDB 항목 JSON. 코드펜스(```)가 있어도 자동 제거합니다.'></textarea></div>
+    <div class="field-row" style="margin-top:10px">
+      <div class="field" style="width:auto"><label for="adCheckNominal">검증용 명목 (선택 · 실효100)</label>
+        <input type="text" id="adCheckNominal" placeholder="예: nata cc=67; miho cc=46" style="width:260px"></div>
+      <div class="field" style="width:auto"><label for="adBest">연습 베스트1 점수 (선택)</label>
+        <input type="number" id="adBest" placeholder="record 대조" style="width:160px"></div>
+    </div>
+    <div class="preset-row" style="margin-top:12px">
+      <button class="act primary" id="adValidateBtn">검증</button>
+      <label class="admin-check"><input type="checkbox" id="adForce">경고 무시하고 병합</label>
+      <button class="act" id="adMergeBtn" disabled>병합 + data.js 내려받기</button>
+    </div>
+    <div class="admin-out" id="adOut"></div>
+  </div>
 </div>
 
 <!-- 데이터 번들(캐릭터/콘텐츠 DB) — 엔진보다 먼저 로드. 손 갱신은 이 파일만. -->
@@ -504,6 +585,361 @@ if (DATA_OK) {
 } else {
   showDataError();
 }
+
+/* ============================================================
+ * ADMIN — 복붙 브릿지 (#admin). 입력 파이프라인 전용.
+ *   엔진/CONFIG/데이터 로직은 건드리지 않는다. 위 스코프(CONFIG,
+ *   characterDB, contentDB, window.SKNR_DB)를 읽기만 하고,
+ *   데이터는 오직 data.js 내려받기로만 나간다.
+ * ============================================================ */
+(function admin() {
+  const panel = $("adminPanel");
+  if (!panel) return;
+
+  // ---- 진입 ----
+  // 관리자(버튼+패널)는 URL 해시가 #admin 일 때만 존재한다. 해시가 없으면 버튼도
+  // 패널도 완전히 숨김 (지속 저장 없음). 즉 #admin 이 유일한 진입점이며, 흔적을 남기지 않는다.
+  // (5.1: 관리자 기능은 일반 UI에 노출하지 않는다.)
+  const adminBtn = $("modeAdmin");
+  function inAdmin() { return (location.hash || "").replace(/^#/, "").toLowerCase() === "admin"; }
+  function setOpen(open) {
+    panel.classList.toggle("hidden", !open);
+    document.body.classList.toggle("admin-view", open);   // 일반 UI 숨기고 관리자만
+    if (adminBtn) adminBtn.classList.toggle("active", open);
+    // 상단 토글을 단일 선택처럼: 관리자 켜면 Basic/Standard 하이라이트 제거,
+    // 끄면 현재 모드(mode) 하이라이트 복원.
+    const mb = $("modeBasic"), ms = $("modeStandard");
+    if (open) {
+      if (mb) mb.classList.remove("active");
+      if (ms) ms.classList.remove("active");
+    } else {
+      if (mb) mb.classList.toggle("active", mode === "basic");
+      if (ms) ms.classList.toggle("active", mode === "standard");
+    }
+  }
+  function syncHash() {
+    if (inAdmin()) {                       // #admin 세션: 버튼 노출 + 패널 열기
+      if (adminBtn) adminBtn.classList.remove("hidden");
+      setOpen(true);
+    } else {                               // 해시 없음: 관리자 흔적 전부 숨김
+      if (adminBtn) adminBtn.classList.add("hidden");
+      setOpen(false);
+    }
+  }
+  window.addEventListener("hashchange", syncHash);
+  // #admin 세션 안에서 "관리자" 버튼은 패널 여닫기 토글, Basic/Standard 는 플레이어 뷰로 복귀.
+  if (adminBtn) adminBtn.addEventListener("click", () => setOpen(panel.classList.contains("hidden")));
+  ["modeBasic", "modeStandard"].forEach(id => { const b = $(id); if (b) b.addEventListener("click", () => setOpen(false)); });
+  syncHash();
+
+  const esc = s => String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+  /* ---- 5.2 프롬프트 생성기 ---- */
+  const SCHEMA_TEXT =
+`characterDB[id] = {
+  name: string,
+  baseStats: { cc:number, cd:number, wc:number },   // 치확/치피/약확 기본치
+  critSelfBuff: number,                             // 본인 패시브 등 장비 외 치확
+  weakType: "bonus" | "missZero" | "none",
+  reqWeakEff: number | null                         // 실효 요구 약확 (none이면 null)
+}
+contentDB[id] = {
+  name: string,
+  scoring: "best1of5" | "top3of9" | "single",
+  roster: [id, ...],
+  shares: { id: pct, ... },        // 지분(%), 실측
+  hits:   { id: 타수, ... },        // 시전 횟수 x 타깃 수
+  weakBuff: { id: val, ... },      // 콘텐츠발 약확 버프(있을 때만)
+  buffRouting: <아래 2종> | null,
+  record: number,                  // 검증된 실측 최고점
+  rotation: string                 // 스킬 순서, 열람용(계산 미사용)
+}
+buffRouting:
+  { type:"rank", value:N, targets:[id,...], note:"..." }   // 공격력 상위 N위에게 버프
+  { type:"gap",  target:id, ref:id, value:X, note:"..." }   // ref가 target보다 X 이상 높으면 버프 샘`;
+
+  const RULES_TEXT =
+`- hits = 시전 횟수 x 타깃 수. 공성전 보스는 3체이므로 hits = 시전 x 3.
+- "명목 != 100" 공리: 명목 치확/약확이 100이 아니면 숨은 수급원이 존재한다.
+  실효 = 명목 + critSelfBuff + weakBuff = 100 이 되도록 숨은 값을 역산해 채운다.
+- 기댓값형 분류: 지분 <= 10% 또는 평타 요원 -> 기댓값형(치확 95~100), 밴드 계산 제외.
+- 약공 유형: bonus(요구치-10까지 평탄), missZero(미스=딜0, 100 고정), none(약공 없음).
+- 버프 라우팅 판별: "공격력 상위 N인에게" -> rank. "특정 캐릭 대비 X 격차" -> gap.
+- rotation(스킬 순서)은 열람용 텍스트로만 저장, 계산에 쓰지 않는다.`;
+
+  function buildPrompt() {
+    const id = $("adId").value.trim() || "<id>";
+    const name = $("adName").value.trim() || "<name>";
+    const scoring = $("adScoring").value;
+    const guide = $("adGuide").value.trim() || "(텍스트 없음 — 첨부된 공략 이미지를 참조하십시오.)";
+    const nominal = $("adNominal").value.trim() || "(별도 입력 없음 — 공략 텍스트/이미지에서 읽으십시오.)";
+    return (
+`[역할]
+당신은 세나리버스 콘텐츠 데이터를 구조화하는 변환기입니다. 아래 스키마와 모델링 규칙에 따라, 주어진 공략(텍스트 및/또는 첨부 이미지)과 명목 스탯을 contentDB 항목 하나로 변환하십시오. 당신은 언어·이미지 해석만 하고, 수치 규칙은 아래에 박힌 것을 그대로 따르는 교체 가능한 부품입니다.
+
+[스키마]
+${SCHEMA_TEXT}
+
+[모델링 규칙 — 반드시 따를 것]
+${RULES_TEXT}
+
+[콘텐츠]
+id: ${id}
+name: ${name}
+scoring: ${scoring}
+
+[공략 입력 — 텍스트 또는 이미지]
+공략은 아래 텍스트, 그리고/또는 이 대화에 첨부된 이미지로 제공됩니다.
+- 이미지가 첨부되어 있으면, 이미지에서 공략 내용과 명목 수치(치확·치피·약확·지분·타수·기록 등)를 읽으십시오.
+- 아래 텍스트가 있으면 함께 사용하고, 텍스트와 이미지가 상충하면 이미지의 실제 수치를 신뢰하십시오.
+
+공략 텍스트:
+${guide}
+
+명목 스탯:
+${nominal}
+
+[출력 지시]
+아래 형태의 순수 JSON 하나만 출력하십시오. 마크다운 코드펜스·서문·설명 절대 금지.
+{
+  "id": "${id}",
+  "contentDB": {
+    "name": "${name}",
+    "scoring": "${scoring}",
+    "roster": ["..."],
+    "shares": { "id": 0 },
+    "hits": { "id": 0 },
+    "weakBuff": { "id": 0 },
+    "buffRouting": null,
+    "record": 0,
+    "rotation": ""
+  },
+  "characterDB": {  /* 신규 캐릭터가 있을 때만. 없으면 이 키 생략 */
+    "newid": { "name":"", "baseStats":{"cc":0,"cd":150,"wc":0}, "critSelfBuff":0, "weakType":"bonus", "reqWeakEff":100 }
+  }
+}`);
+  }
+
+  // 공략 이미지 첨부 — 앱은 읽지 않는다(OCR·네트워크 없음). 로컬 미리보기 + 첨부 알림만.
+  let imgAttached = false, imgURL = null;
+  $("adImgBtn").addEventListener("click", () => $("adImgFile").click());
+  $("adImgFile").addEventListener("change", e => {
+    const f = e.target.files[0]; if (!f) return;
+    imgAttached = true;
+    if (imgURL) URL.revokeObjectURL(imgURL);
+    imgURL = URL.createObjectURL(f);
+    const p = $("adImgPreview"); p.src = imgURL; p.classList.remove("hidden");
+    $("adImgName").textContent = f.name;
+    $("adImgClear").classList.remove("hidden");
+  });
+  $("adImgClear").addEventListener("click", () => {
+    imgAttached = false;
+    if (imgURL) { URL.revokeObjectURL(imgURL); imgURL = null; }
+    $("adImgFile").value = "";
+    const p = $("adImgPreview"); p.src = ""; p.classList.add("hidden");
+    $("adImgName").textContent = "";
+    $("adImgClear").classList.add("hidden");
+  });
+
+  $("adGenBtn").addEventListener("click", () => { $("adPromptOut").value = buildPrompt(); });
+  $("adCopyBtn").addEventListener("click", async () => {
+    const t = $("adPromptOut").value || buildPrompt();
+    $("adPromptOut").value = t;
+    const done = () => {
+      $("adCopyMsg").textContent = imgAttached ? "복사됨 ✓ — 채팅에 공략 이미지도 함께 첨부하세요" : "복사됨 ✓";
+      setTimeout(() => $("adCopyMsg").textContent = "", imgAttached ? 4000 : 1500);
+    };
+    try { await navigator.clipboard.writeText(t); done(); }
+    catch (e) { $("adPromptOut").select(); document.execCommand("copy"); done(); }
+  });
+
+  /* ---- 5.3 검증 ---- */
+  const SCORINGS = ["best1of5", "top3of9", "single"];
+  const WEAKTYPES = ["bonus", "missZero", "none"];
+
+  function stripFences(s) {
+    let t = s.trim();
+    const m = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (m) t = m[1].trim();
+    // 앞뒤 잡텍스트 제거: 첫 { ~ 마지막 }
+    const a = t.indexOf("{"), b = t.lastIndexOf("}");
+    if (a >= 0 && b > a) t = t.slice(a, b + 1);
+    return t;
+  }
+
+  function parseNominal(str) {
+    const out = {};
+    (str || "").split(/[;\n,]/).forEach(tok => {
+      tok = tok.trim(); if (!tok) return;
+      const idm = tok.match(/^([A-Za-z_]\w*)/); if (!idm) return;
+      const id = idm[1];
+      const cc = tok.match(/cc\s*=\s*(\d+(?:\.\d+)?)/i);
+      const wc = tok.match(/wc\s*=\s*(\d+(?:\.\d+)?)/i);
+      out[id] = {};
+      if (cc) out[id].cc = +cc[1];
+      if (wc) out[id].wc = +wc[1];
+    });
+    return out;
+  }
+
+  const isNum = v => typeof v === "number" && isFinite(v);
+  const isObj = v => v && typeof v === "object" && !Array.isArray(v);
+
+  // returns { errors:[], warnings:[], root } ; root=null on parse fail
+  function validate() {
+    const errors = [], warnings = [];
+    let root;
+    try { root = JSON.parse(stripFences($("adJson").value)); }
+    catch (e) { return { errors: ["JSON 파싱 실패: " + e.message], warnings: [], root: null }; }
+
+    if (!isObj(root)) { return { errors: ["최상위가 객체가 아닙니다."], warnings: [], root: null }; }
+    if (typeof root.id !== "string" || !root.id.trim()) errors.push("id: 문자열 필요.");
+    const c = root.contentDB;
+    if (!isObj(c)) { errors.push("contentDB: 객체 필요."); return { errors, warnings, root }; }
+
+    // ---- 스키마 검증 ----
+    if (typeof c.name !== "string") errors.push("contentDB.name: 문자열 필요.");
+    if (!SCORINGS.includes(c.scoring)) errors.push(`contentDB.scoring: ${SCORINGS.join("|")} 중 하나여야 함 (받음: ${esc(c.scoring)}).`);
+    if (!Array.isArray(c.roster) || !c.roster.every(x => typeof x === "string") || !c.roster.length)
+      errors.push("contentDB.roster: 비어있지 않은 문자열 배열 필요.");
+    const roster = Array.isArray(c.roster) ? c.roster : [];
+    const rset = new Set(roster);
+
+    ["shares", "hits"].forEach(k => {
+      if (!isObj(c[k])) { errors.push(`contentDB.${k}: 객체 필요.`); return; }
+      Object.entries(c[k]).forEach(([id, v]) => {
+        if (!rset.has(id)) errors.push(`${k}.${esc(id)}: roster에 없는 캐릭터.`);
+        if (!isNum(v)) errors.push(`${k}.${esc(id)}: 숫자 필요.`);
+      });
+    });
+    if (isObj(c.shares)) roster.forEach(id => { if (!(id in c.shares)) warnings.push(`shares.${esc(id)} 누락 — 0으로 간주.`); });
+
+    if (c.weakBuff != null) {
+      if (!isObj(c.weakBuff)) errors.push("contentDB.weakBuff: 객체 또는 생략.");
+      else Object.entries(c.weakBuff).forEach(([id, v]) => {
+        if (!rset.has(id)) errors.push(`weakBuff.${esc(id)}: roster에 없는 캐릭터.`);
+        if (!isNum(v)) errors.push(`weakBuff.${esc(id)}: 숫자 필요.`);
+      });
+    }
+
+    const br = c.buffRouting;
+    if (br != null) {
+      if (!isObj(br) || !["rank", "gap"].includes(br.type)) errors.push('buffRouting.type: "rank" 또는 "gap" 필요.');
+      else if (br.type === "rank") {
+        if (!isNum(br.value)) errors.push("buffRouting(rank).value: 숫자 필요.");
+        if (!Array.isArray(br.targets) || !br.targets.every(x => rset.has(x))) errors.push("buffRouting(rank).targets: roster 내 id 배열 필요.");
+      } else {
+        if (!rset.has(br.target)) errors.push("buffRouting(gap).target: roster 내 id 필요.");
+        if (!rset.has(br.ref)) errors.push("buffRouting(gap).ref: roster 내 id 필요.");
+        if (!isNum(br.value)) errors.push("buffRouting(gap).value: 숫자 필요.");
+      }
+    }
+    if (!isNum(c.record)) errors.push("contentDB.record: 숫자 필요.");
+    if (c.rotation != null && typeof c.rotation !== "string") errors.push("contentDB.rotation: 문자열 또는 생략.");
+
+    // ---- 신규 characterDB 검증 + roster 캐릭터 존재 확인 ----
+    const newChars = isObj(root.characterDB) ? root.characterDB : {};
+    Object.entries(newChars).forEach(([id, ch]) => {
+      if (!isObj(ch)) { errors.push(`characterDB.${esc(id)}: 객체 필요.`); return; }
+      if (typeof ch.name !== "string") errors.push(`characterDB.${esc(id)}.name: 문자열 필요.`);
+      if (!isObj(ch.baseStats) || !["cc", "cd", "wc"].every(k => isNum(ch.baseStats[k])))
+        errors.push(`characterDB.${esc(id)}.baseStats: {cc,cd,wc} 숫자 필요.`);
+      if (!isNum(ch.critSelfBuff)) errors.push(`characterDB.${esc(id)}.critSelfBuff: 숫자 필요.`);
+      if (!WEAKTYPES.includes(ch.weakType)) errors.push(`characterDB.${esc(id)}.weakType: ${WEAKTYPES.join("|")} 필요.`);
+      if (!(ch.reqWeakEff === null || isNum(ch.reqWeakEff))) errors.push(`characterDB.${esc(id)}.reqWeakEff: 숫자 또는 null 필요.`);
+    });
+    const known = id => (id in characterDB) || (id in newChars);
+    roster.forEach(id => { if (!known(id)) errors.push(`roster의 ${esc(id)}: characterDB(기존/신규 어디에도) 정의 없음.`); });
+
+    // ---- 도메인 검증 (a) 실효100 공리 ----
+    const nom = parseNominal($("adCheckNominal").value);
+    const charOf = id => newChars[id] || characterDB[id] || null;
+    const cut = CONFIG.expectationShareCut;
+    roster.forEach(id => {
+      const share = (c.shares && c.shares[id]) || 0;
+      if (share <= cut) return;                       // 기댓값형 제외
+      const ch = charOf(id); if (!ch) return;
+      const n = nom[id];
+      if (!n || n.cc == null) return;                 // 명목 미제공 → 건너뜀
+      const eff = n.cc + (ch.critSelfBuff || 0);
+      const tag = `[실효100] ${esc(ch.name || id)}: 명목 치확 ${n.cc} + critSelfBuff ${ch.critSelfBuff || 0} = ${r1(eff)}`;
+      if (Math.abs(eff - 100) <= 3) warnings.push({ ok: true, msg: tag + " — 통과" });
+      else warnings.push(tag + ` — 100에서 벗어남 (숨은 수급원/역산 확인).`);
+    });
+
+    // ---- 도메인 검증 (b) 기록 대조 ----
+    const bestStr = $("adBest").value;
+    if (bestStr !== "" && isNum(c.record) && c.record > 0) {
+      const best = +bestStr;
+      const dev = Math.abs(best - c.record) / c.record;
+      if (dev > 0.25) warnings.push(`[기록] 입력 베스트 ${best.toLocaleString()} vs record ${c.record.toLocaleString()} — ${(dev * 100).toFixed(0)}% 차이(이상치 의심).`);
+      else warnings.push({ ok: true, msg: `[기록] 베스트 ${best.toLocaleString()} 가 record ${c.record.toLocaleString()} 와 정합(±${(dev * 100).toFixed(0)}%).` });
+    }
+
+    return { errors, warnings, root };
+  }
+
+  let lastRoot = null, lastHasWarn = false;
+  function renderOut(res) {
+    const out = $("adOut"); const lines = [];
+    if (res.errors.length) {
+      lines.push(`<div class="ln head">✗ 오류 ${res.errors.length}건 — 병합 차단</div>`);
+      res.errors.forEach(e => lines.push(`<div class="ln bad">${esc(e)}</div>`));
+    }
+    if (res.warnings.length) {
+      lines.push(`<div class="ln head">경고/확인 ${res.warnings.length}건</div>`);
+      res.warnings.forEach(w => {
+        if (w && w.ok) lines.push(`<div class="ln ok">${esc(w.msg)}</div>`);
+        else lines.push(`<div class="ln warn">${esc(typeof w === "string" ? w : w.msg)}</div>`);
+      });
+    }
+    const realWarn = res.warnings.filter(w => !(w && w.ok)).length;
+    if (!res.errors.length && !realWarn) lines.push(`<div class="ln ok">✓ 모든 검증 통과 — 병합 가능.</div>`);
+    out.innerHTML = lines.join("");
+    lastHasWarn = realWarn > 0;
+  }
+
+  $("adValidateBtn").addEventListener("click", () => {
+    const res = validate();
+    renderOut(res);
+    lastRoot = res.errors.length ? null : res.root;
+    $("adMergeBtn").disabled = !lastRoot;
+  });
+
+  /* ---- 5.4 병합 + 내보내기 ---- */
+  function download(name, text) {
+    const blob = new Blob([text], { type: "application/javascript" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = name; a.click();
+    URL.revokeObjectURL(a.href);
+  }
+  function serialize(db) {
+    return (
+`/* ============================================================
+ * data.js — SKNR 데이터 번들 (캐릭터 DB + 콘텐츠 DB)
+ * 관리자 패널(#admin)로 생성. 손 갱신 가능.
+ * dataVersion 은 index.html CONFIG.schemaVersion 과 일치해야 함.
+ * ============================================================ */
+window.SKNR_DB = ${JSON.stringify(db, null, 2)};
+`);
+  }
+  $("adMergeBtn").addEventListener("click", () => {
+    if (!lastRoot) return;
+    if (lastHasWarn && !$("adForce").checked) {
+      const out = $("adOut");
+      out.insertAdjacentHTML("beforeend", `<div class="ln warn">경고가 있어 기본 차단됨. "경고 무시하고 병합"을 체크하면 진행합니다.</div>`);
+      return;
+    }
+    const db = window.SKNR_DB;
+    db.contentDB[lastRoot.id] = lastRoot.contentDB;
+    if (isObj(lastRoot.characterDB)) Object.assign(db.characterDB, lastRoot.characterDB);
+    db.updated = new Date().toISOString().slice(0, 10);
+    // dataVersion 은 유지 (schemaVersion 불변)
+    download("data.js", serialize(db));
+    $("adOut").insertAdjacentHTML("beforeend",
+      `<div class="ln ok">✓ 병합 완료 — contentDB.${esc(lastRoot.id)} 갱신, updated=${db.updated}. data.js 내려받음. GitHub에 덮어쓰기 하세요.</div>`);
+  });
+})();
 </script>
 </body>
 </html>
